@@ -1,0 +1,11 @@
+/fdr/main.bin
+/fdr/main.html
+/fdr/list/*
+/release/*
+*.exe
+*.o
+*.bak
+*.udi
+*.trd
+*.FDR
+FDRIMAGE.*

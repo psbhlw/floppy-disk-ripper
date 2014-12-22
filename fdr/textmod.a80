@@ -1,0 +1,578 @@
+/*
+    Textmod functions.
+
+    This file is part of Floppy Disk Ripper (FDR) program.
+    Copyright (C) 2014, psb^hlw.
+
+    FDR is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    FDR is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+        NAME    textmod(16)
+        RSEG    CODE
+        PUBLIC  textmod_init
+        PUBLIC  cls
+        PUBLIC  gotoxy
+        PUBLIC  getxy
+        PUBLIC  set_clr
+        PUBLIC  print_char
+        PUBLIC  print_str
+        PUBLIC  print_pad
+        PUBLIC  fill_attr
+        PUBLIC  store_win
+        PUBLIC  restore_win
+        PUBLIC  draw_win
+        EXTERN  FONT
+
+DEFAULT_CLR equ 0x1f
+
+
+; Enhanced FDD-Conf Ports
+VConfig  equ    0x00AF
+VPage    equ    0x01AF
+PalSel   equ    0x07AF
+FMAddr   equ    0x15AF
+PAGESLT3 equ    0x13AF
+Border   equ    0x0FAF
+PageDflt equ    0
+
+
+textmod_init
+;;; void textmod_init(void);
+        push bc
+        push de
+        call textmod_init_
+        pop de
+        pop bc
+        ret
+
+textmod_init_
+        ;out (VConfig), 0x80 | 3
+        ld bc,VConfig
+        ld a,0x80 | 3
+        out (c),a
+
+        ;out (Vpage),0
+        ld b,high(VPage)
+        ld a,PageDflt
+        out (c),a
+
+        ;поллитра:
+        ;out (FMAddr), 0x10
+        ld b,high(FMAddr)
+        ld a,0x10
+        out (c),a
+
+        ;memcpy (0, palette, 32);
+        ld hl,palette
+        ld de,0
+        ld bc,32
+        ldir
+
+        ;out (FMAddr), 0
+        ld bc,FMAddr
+        xor a
+        out (c),a
+
+        ;out (PalSel), 0
+        ld b,high(PalSel)
+        out (c),a
+
+        ; load font
+        ld b,high(PAGESLT3)
+        ld a,PageDflt^1
+        out (c),a
+
+        ld hl,FONT
+        ld bc,0x800     ; todo: eval size
+        ld de,0xc000
+        ldir
+        ld (winptr),de
+
+        ld bc,PAGESLT3
+        ld a,0
+        out (c),a
+
+        ld a,DEFAULT_CLR
+        ld (curr_clr),a
+        call cls_
+        ret
+
+
+cls
+;;; void cls(void);
+        push bc
+        push de
+        call cls_
+        pop de
+        pop bc
+        ret
+
+cls_
+        ld a,(curr_clr)
+        ; set border
+        ld d,a
+        rrca
+        rrca
+        rrca
+        rrca
+        and 0x0f
+        ld bc,Border
+        out (c),a
+        ld hl,0xc000
+        ld (printxy),hl
+        ld bc,0x501e    ;30 lines
+cl1     push bc
+        push hl
+cl2     ld (hl),0x20
+        set 7,l
+        ld (hl),d
+        res 7,l
+        inc hl
+        djnz cl2
+        pop hl
+        pop bc
+        inc h
+        dec c
+        jr nz,cl1
+
+        ld b,c
+        ld (basexy),bc  ;0
+        ret
+
+
+gotoxy
+;;; void gotoxy(BYTE x, BYTE y);
+        ld l,e
+        ld h,c
+;;;
+;hl=yx
+gotoxy_
+        set 7,h
+        set 6,h
+        ld de,(basexy)
+        add hl,de
+        ld (printxy),hl
+        ret
+
+getxy
+;;; void getxy(BYTE *x, BYTE *y);
+
+;;;
+        push de
+        ld hl,(printxy)
+        ld de,(basexy)
+        or a
+        sbc hl,de
+        res 7,h
+        res 6,h
+        pop de
+        ld a,l
+        ld (de),a
+        ld a,h
+        ld (bc),a
+        ret
+
+
+
+set_clr
+;;; void set_clr(BYTE clr);
+        ld a,e
+        ld (curr_clr),a
+        ret
+
+print_char
+;;; void printchar(char c);
+        ld a,e
+        ; bc is unused
+;;;
+        ld hl,(printxy)
+
+        ld (hl),a
+        set 7,l
+        ld a,(curr_clr)
+        ld (hl),a
+        res 7,l
+
+        inc l
+        ld a,l
+        cp 80
+        jr c,pc1
+        ld l,0
+        inc h
+pc1     ld (printxy),hl
+        ret
+
+
+print_str
+;;; void printstr(char *str);
+  push bc
+        ex de,hl
+        call print_str_
+  pop bc
+        ret
+;;;
+print_str_
+        ex de,hl
+        ld hl,(printxy)
+        ld a,(curr_clr)
+        ld c,a
+
+ps1     ld a,(de)
+        or a
+        jr z,pse
+        inc de
+        cp 16
+        jr z,psc
+        cp 13
+        jr z,psn
+        cp 10
+        jr z,psn
+        cp 22
+        jr z,psa
+
+        ld (hl),a
+        set 7,l
+        ld (hl),c
+        res 7,l
+        inc l
+        ld a,l
+        cp 80
+        jr c,ps1
+        ld l,0
+        inc h
+        jr ps1
+
+psc     ld a,(de)
+        ld c,a
+        inc de
+        jr ps1
+
+psn     inc h
+        ld l,0
+        jr ps1
+
+pse     ld a,c
+        ld (curr_clr),a
+        ld (printxy),hl
+        ret
+
+psa     ld a,(de)
+        ld l,a
+        inc de
+        ld a,(de)
+        ld h,a
+        inc de
+        push de
+        call gotoxy_
+        pop de
+        jr ps1
+
+
+
+print_pad
+;;; void print_pad(BYTE until_x);
+        ld a,e
+  push bc
+        call print_pad_
+  pop bc
+        ret
+;;;
+;a=to X
+print_pad_
+        ld b,a
+        ld hl,(printxy)
+        ld a,(curr_clr)
+        ld c,a
+
+pp1     ld (hl),0x20
+        set 7,l
+        ld (hl),c
+        res 7,l
+        inc l
+        ld a,l
+        cp b
+        jr c,pp1
+
+        ld (printxy),hl
+        ret
+
+
+fill_attr
+;;; void fill_attr(BYTE x, BYTE y, BYTE len, BYTE clr);
+        ld d,c
+        ld hl,2
+        add hl,sp
+        ld b,(hl)
+        inc hl
+        inc hl
+        ld c,(hl)
+        ex de,hl
+;;;
+;hl=yx, b=len, c=clr
+        set 7,h
+        set 6,h
+        set 7,l
+fa1     ld (hl),c
+        inc l
+        djnz fa1
+        ret
+
+
+store_win
+;;; void store_win(BYTE x, BYTE y, BYTE w, BYTE h);
+        ld d,c
+        ld hl,2
+        add hl,sp
+        ld c,(hl)
+        inc hl
+        inc hl
+        ld b,(hl)
+        ex de,hl
+
+  exx
+  push bc
+  exx
+        call store_win_
+  exx
+  pop bc
+  exx
+        ret
+;;;
+;hl=yx, bc=hw
+store_win_
+        set 7,h
+        set 6,h
+        ex de,hl
+        exx
+        ld bc,PAGESLT3
+        ld hl,0x0001
+        out (c),l
+        exx
+        ld hl,(winptr)
+        push hl
+        ld (hl),e
+        inc hl
+        ld (hl),d
+        inc hl
+        ld (hl),c
+        inc hl
+        ld (hl),b
+        inc hl
+
+sw1     push bc
+        push de
+sw2
+        exx
+        out (c),h
+        exx
+        ld a,(de)
+        ex af,af'
+        set 7,e
+        ld a,(de)
+        res 7,e
+        exx
+        out (c),l
+        exx
+        ld (hl),a       ;attr
+        inc hl
+        ex af,af'
+        ld (hl),a       ;char
+        inc hl
+        inc e
+        dec c
+        jr nz,sw2
+
+        pop de
+        pop bc
+        inc d
+        djnz sw1
+
+        pop de
+        ld (hl),e
+        inc hl
+        ld (hl),d
+        inc hl
+        ld de,(basexy)
+        ld (hl),e
+        inc hl
+        ld (hl),d
+        inc hl
+        ld (winptr),hl
+        exx
+        out (c),h
+        exx
+        ret
+
+restore_win
+;;; void restore_win(void);
+  push bc
+  push de
+  exx
+  push bc
+  exx
+        call restore_win_
+  exx
+  pop bc
+  exx
+  pop de
+  pop bc
+        ret
+
+restore_win_
+        exx
+        ld bc,PAGESLT3
+        ld hl,0x0001
+        out (c),l
+        exx
+        ld hl,(winptr)
+        dec hl
+        ld d,(hl)
+        dec hl
+        ld e,(hl)
+        ld (basexy),de
+        dec hl
+        ld d,(hl)
+        dec hl
+        ld e,(hl)
+        ex de,hl
+        ld (winptr),hl
+        ld e,(hl)
+        inc hl
+        ld d,(hl)
+        inc hl
+        ld c,(hl)
+        inc hl
+        ld b,(hl)
+        inc hl
+
+rw1     push bc
+        push de
+rw2
+        exx
+        out (c),l
+        exx
+        ld a,(hl)       ;attr
+        inc hl
+        ex af,af'
+        ld a,(hl)       ;char
+        inc hl
+        exx
+        out (c),h
+        exx
+        ld (de),a
+        set 7,e
+        ex af,af'
+        ld (de),a
+        res 7,e
+        inc e
+        dec c
+        jr nz,rw2
+
+        pop de
+        pop bc
+        inc d
+        djnz rw1
+        ret
+
+
+draw_win
+;;; void draw_win(BYTE x, BYTE y, BYTE w, BYTE h, BYTE clr);
+        ld d,c
+        ld hl,2
+        add hl,sp
+        ld c,(hl)
+        inc hl
+        inc hl
+        ld b,(hl)
+        inc hl
+        inc hl
+        ld a,(hl)
+        ex de,hl
+
+;;;
+;hl=yx, bc=hw, a=clr
+        halt            ; anti-flicker
+        ld (basexy),hl
+        set 7,h
+        set 6,h
+        ld (curr_clr),a
+        ld e,a
+
+        dec c
+        dec c
+        dec b
+        dec b
+        push bc
+        push hl
+        ld d,218
+        ld a,196
+        ld b,191
+        call drawln
+        pop hl
+        pop bc
+        inc h
+
+        ld d,179
+        ld a,' '
+dw1     push bc
+        push hl
+        ld b,d
+        call drawln
+        pop hl
+        pop bc
+        inc h
+        djnz dw1
+
+        ld d,192
+        ld a,196
+        ld b,217
+        call drawln
+        ret
+
+
+; e=clr, d/b=bord char, a=mid char
+drawln
+        ld (hl),d
+        set 7,l
+        ld (hl),e
+        res 7,l
+        inc l
+dl1     ld (hl),a
+        set 7,l
+        ld (hl),e
+        res 7,l
+        inc l
+        dec c
+        jr nz,dl1
+        ld (hl),b
+        set 7,l
+        ld (hl),e
+        res 7,l
+        ret
+
+
+
+        RSEG    CONST
+palette
+        defb 0x00,0x00,0x10,0x00,0x10,0x61,0x18,0x62
+        defb 0x00,0x02,0x10,0x01,0x00,0x61,0x10,0x62
+        defb 0x10,0x42,0x18,0x00,0x00,0x60,0x10,0x40
+        defb 0x00,0x03,0x18,0x02,0x00,0x63,0x18,0x63
+
+        RSEG    UDATA0
+winptr  defs 2  ; addr of buffer for storing win
+printxy defs 2  ; addr in screen
+basexy  defs 2  ; base coords
+curr_clr defs 1 ; current color
+
+        END

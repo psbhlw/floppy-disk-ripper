@@ -1,0 +1,61 @@
+; Basic loader
+        device zxspectrum128
+
+        org #5d3b
+start   dw #100                         ; line number = 1
+        dw lend-lbegin                  ; line length
+lbegin  db #fd,#30                      ; 'clear' 0
+        db #0e,#00,#00,#ff,#ff,#00      ;   value=#ffff
+        db #3a,#f9,#c0,#30              ; ':' 'rand' 'usr' 0
+        db #0e,#00,#00:dw code:db #00   ;   start address
+        db #3a,#ea                      ; ':' 'rem'
+
+data
+	incbin "main.bin"
+
+code    di
+
+        ; check hw
+        ld bc,#00af:in a,(c)
+        cp #ff:jr z,wronghw
+        bit 5,a:jr z,wronghw
+
+CPUFREQ equ 0x20AF
+        ld bc,CPUFREQ
+        ld a,2
+        out (c),a
+
+	ld hl,data,de,#4000,bc,code-data:ldir
+        jp #4000
+
+wronghw
+;        ld bc,#7ffd:xor a:out (c),a:rst 0
+;        ld hl,0:push hl:jp #3d2f
+
+        XOR  A
+        OUT  (#FE),A
+        LD   A,#47
+        LD   (23693),A
+        LD   (23624),A
+        CALL #0D6B
+        LD   A,2
+        CALL #1601
+
+        LD   DE,TEXT
+        LD   BC,TEXTLEN
+        CALL #203C
+
+        jp $        
+
+TEXT    db 22,11,2
+        db "Sorry, this program requires"
+        db 22,13,5
+        db "special ZX Evo config."
+TEXTLEN equ $-TEXT
+
+        db #0d                          ; enter (end of basic line)
+lend
+
+        emptytrd "fdr.trd"
+        savetrd  "fdr.trd","FDR.B",#5d3b,lend-start
+;        SAVEHOB "fdr.$b","FDR.B",#5d3b,lend-start

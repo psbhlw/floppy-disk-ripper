@@ -1,0 +1,221 @@
+/*
+    Keyboard functions.
+
+    This file is part of Floppy Disk Ripper (FDR) program.
+    Copyright (C) 2014, psb^hlw.
+
+    FDR is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    FDR is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+        NAME    keyb(16)
+        RSEG    CODE
+        PUBLIC  keyboard
+        PUBLIC  is_key_pressed
+        PUBLIC  is_break_pressed
+
+
+reptime     equ 2       ; auto-repeat delay
+firsttime   equ 20      ; before auto-repeat delay
+
+; Be sure they are the same as in keyb.h.
+kbNONE      equ 0       ; no keys
+kbTRUEV     equ 1       ; true video
+kbINVV      equ 2       ; inv video
+kbEDIT      equ 3       ; edit
+kbEMODE     equ 4       ; ext mode(unimplemented)
+kbCAPS      equ 5       ; caps lock
+kbGRAPH     equ 6       ; graph
+kbSSSP      equ 7       ; ss+space
+kbLEFT      equ 8       ; cursor left
+kbRIGHT     equ 9       ; cursor right
+kbDOWN      equ 10      ; cursor down
+kbUP        equ 11      ; cursor up
+kbDEL       equ 12      ; delete
+kbENTER     equ 13      ; enter
+kbBREAK     equ 27      ; break
+
+
+
+; get key routine (with auto-repeat)
+keyboard
+;;; char keyboard(void);
+  push bc
+  push de
+        call keyboard_
+  pop de
+  pop bc
+        ret
+
+keyboard_
+        call get_key            ; get currently pressed key
+        ld hl,keycnt            ; @counter
+        or a
+        jr nz,pressed           ; something pressed
+        ; no keys - clear all
+nokeypr xor a
+        ld (lastkey),a
+        ld (hl),a
+        ret
+
+pressed
+        ld c,a
+        ld a,(hl)
+        or a
+        jr z,new_key_rep        ; counter == 0? process repeat/new key
+
+        ; delay
+        dec (hl)                ; counter--
+        ld a,(lastkey)
+        sub c
+        jr nz,nokeypr           ; key changed during timer? stop!
+        ; a=0
+        ret
+
+        ; new press or repeat
+new_key_rep
+        ld b,firsttime          ; first time delay
+        ld a,(lastkey)          ; was anything pressed?
+        or a
+        jr z,cntr_set           ; first press
+
+        sub c
+        jr nz,nokeypr           ; not still the same key? stop!
+
+        ;auto repeat
+        ld b,reptime            ; repeat delay
+cntr_set ld (hl),b              ; set counter
+
+        ld a,c
+        ld (lastkey),a
+        ret
+
+
+; get currently pressing key
+get_key
+        ld hl,keysnorm          ; normal key table
+        ld a,0xfe
+        in a,(0xfe)
+        rrca
+        jr c,$+2+3              ; no caps shift
+        ld hl,keyscaps          ; caps shift key table
+        ld a,0x7f
+        in a,(0xfe)
+        rrca
+        rrca
+        jr c,$+2+3              ; no symb shift
+        ld hl,keyssym           ; symb shift key table
+
+        push hl
+        ld hl,keystat           ; process all key stats
+        ld bc,0x0800            ; b=rows, c=current key cntr
+        ld de,0x0000            ; d=pressed keys cntr, e=pressed key number
+gk1
+        ld a,(hl)
+        inc hl
+        REPT 5
+        rrca
+        jr c,$+4
+        ld e,c
+        inc d
+        inc c
+        ENDR
+        djnz gk1
+
+        pop hl
+        ld a,d
+        dec a
+        ld a,b                  ; the only key pressed?
+        jr nz,nokey             ; no, then nothing pressed
+        ld d,a
+        add hl,de               ; get char from appropriate table
+        ld a,(hl)               ; . . .
+nokey
+        ex af,af'
+        ld hl,keystat           ; get new key stats
+        ld bc,0xfefe
+scanloop
+        in a,(c)
+        ld (hl),a
+        inc hl
+        rlc b
+        jr c,scanloop
+
+        ld hl,keystat           ; clear caps shift
+        set 0,(hl)
+        ld hl,keystat+7         ; clear symb shift
+        set 1,(hl)
+        ex af,af'
+        ret
+
+
+;;; char is_key_pressed(void);
+is_key_pressed
+        xor a
+        in a,(0xfe)
+        cpl
+        and 0x1f
+        ret
+
+;;; char is_break_pressed(void);
+is_break_pressed
+        ld a,0xfe
+        in a,(0xfe)
+        rrca
+        jr c,no_brk             ; no caps shift
+        ld a,0x7f
+        in a,(0xfe)
+        rrca
+        jr c,no_brk             ; no space
+        ld a,1
+        ret
+no_brk
+        xor a
+        ret
+
+
+
+        RSEG    CONST
+keysnorm
+        defb 0,'zxcv'
+        defb 'asdfg'
+        defb 'qwert'
+        defb '12345'
+        defb '09876'
+        defb 'poiuy'
+        defb kbENTER,'lkjh'
+        defb ' ',0,'mnb'
+keyscaps
+        defb 0,'ZXCV'
+        defb 'ASDFG'
+        defb 'QWERT'
+        defb kbEDIT,kbCAPS,kbINVV,kbTRUEV,kbLEFT    ;"12345"
+        defb kbDEL,kbGRAPH,kbRIGHT,kbUP,kbDOWN      ;"09876"
+        defb 'POIUY'
+        defb kbENTER,'LKJH'
+        defb kbBREAK,kbEMODE,'MNB'
+keyssym
+        defb kbEMODE,':',96,'?/'
+        defb 0,0,0,0,0
+        defb 0,0,0,'<>'
+        defb '!@#$%'
+        defb '_)(',39,'&'
+        defb '";',0,0,0
+        defb kbENTER,'=+-',94
+        defb kbSSSP,0,'.,*'
+
+        RSEG    UDATA0
+keystat defs 8          ; key states
+keycnt  defs 1          ; delay counter
+lastkey defs 1          ; last pressed key
+
+        END

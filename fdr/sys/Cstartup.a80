@@ -1,0 +1,88 @@
+        NAME    CSTARTUP
+        EXTERN  main
+
+        RSEG    CSTACK
+        DEFS    0
+
+        RSEG    UDATA0
+        RSEG    IDATA0
+        RSEG    ECSTR
+        RSEG    TEMP
+        RSEG    DATA0
+        RSEG    WCSTR
+
+        RSEG    CDATA0
+        RSEG    CCSTR
+        RSEG    CONST
+        RSEG    CSTR
+
+; Interrupt table
+        ASEG
+        ORG     0xbe00
+        defs    0x200
+
+; Entry point
+        RSEG    RCODE
+        LD      SP,.SFE.(CSTACK-1)      ; from high to low address
+
+        LD      HL,0xBE00               ; table address
+        LD      A,0xBF                  ; vector
+        LD      (HL),A
+        INC     L
+        JR      NZ,$-2
+        INC     H
+        LD      (HL),A
+
+        LD      A,0xC3                  ; jp opcode
+        LD      HL,interr               ; int. handler
+        LD      (0xBFBF),A
+        LD      (0xBFBF+1),HL
+        LD      A,0xBE                  ; table address (MSB)
+        LD      I,A
+        IM      2
+
+        CALL    seg_init
+        CALL    main
+        JR $
+
+seg_init
+        LD      HL,.SFE.(UDATA0)
+        LD      DE,.SFB.(UDATA0)
+        CALL    zero_mem
+
+        LD      DE,.SFB.(IDATA0)
+        LD      HL,.SFE.(CDATA0)
+        LD      BC,.SFB.(CDATA0)
+        CALL    copy_mem
+
+        LD      DE,.SFB.(ECSTR)
+        LD      HL,.SFE.(CCSTR)
+        LD      BC,.SFB.(CCSTR)
+
+copy_mem
+        XOR     A
+        SBC     HL,BC
+        PUSH    BC
+        LD      C,L
+        LD      B,H
+        POP     HL
+        RET     Z
+        LDIR
+        RET
+
+zero_mem
+        XOR     A
+again   PUSH    HL
+        SBC     HL,DE
+        POP     HL
+        RET     Z
+        LD      (DE),A
+        INC     DE
+        JR      again
+
+; Dummy interrupt routine
+interr
+        EI
+        RET
+
+        END

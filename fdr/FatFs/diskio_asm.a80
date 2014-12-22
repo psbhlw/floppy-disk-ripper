@@ -1,0 +1,75 @@
+/*
+    Z-Controller block I/O routines for fatfs.
+
+    This file is part of Floppy Disk Ripper (FDR) program.
+    Copyright (C) 2014, psb^hlw.
+
+    FDR is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    FDR is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+        NAME    diskio_asm(16)
+        RSEG    CODE
+        PUBLIC  xmit_spi_multi
+        PUBLIC  rcvr_spi_multi
+
+; /* Send a data block fast */
+; static
+; void xmit_spi_multi (
+;         const BYTE *p,  /* Data block to be sent */
+;         UINT cnt        /* Size of data block */
+; )
+; de=addr, bc=len
+xmit_spi_multi:
+        ld h,d
+        ld l,e
+        add hl,bc
+        ex de,hl
+        ld c,0x57
+_xmit_loop:
+        rept 16
+        outi
+        endr
+        ld a,e
+        cp l
+        jp nz,_xmit_loop
+        ld a,d
+        cp h
+        jp nz,_xmit_loop
+        RET
+
+; /* Receive a data block fast */
+; static
+; void rcvr_spi_multi (
+;         BYTE *p,        /* Data buffer */
+;         UINT cnt        /* Size of data block */
+; )
+; de=addr, bc=len
+rcvr_spi_multi:
+        ld h,d
+        ld l,e
+        add hl,bc
+        ex de,hl
+        ld c,0x57
+_rcvr_loop:
+        rept 16
+        ini
+        endr
+        ld a,e
+        cp l
+        jp nz,_rcvr_loop
+        ld a,d
+        cp h
+        jp nz,_rcvr_loop
+        RET
+
+        END
