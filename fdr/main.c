@@ -61,6 +61,9 @@ uint8_t make_image(char **err_msg)
 {
     uint8_t trk, side, res, rc, s1,s2, sdcpp=0;
     int8_t sdir;
+    static char * const fddi_msgs[] = {"No drive.", "No disk in drive."};
+    static char * const sdcp_msgs[] = {"FatFs: mkdir error.", "FatFs: chdir error.", "File already exists.", "FatFs: open error."};
+    static char * const sdcs_msgs[] = {"File already exists.", "FatFs: open error.", "FatFs: write error.", "Break pressed."};
 
     res = MKI_ERROR;
     //memset(FDR_INFO.file_name, 0, 12);
@@ -68,9 +71,9 @@ uint8_t make_image(char **err_msg)
     ui_show_progress(PGS_INIT);
 
     // Init ZC
-    if (sdc_init()!=SDCI_OK)
+    if (sdc_init()==SDCI_MOUNT_ERR)
     {
-        *err_msg="FatFs mount error.";
+        *err_msg="FatFs: mount error.";
         goto exit;
     }
 
@@ -78,17 +81,15 @@ uint8_t make_image(char **err_msg)
     rc=fdd_init();
     if (rc!=FDDI_OK)
     {
-        if(rc==FDDI_NO_DRIVE)
-            *err_msg="No drive.";
-        else
-            *err_msg="No disk in drive.";
+        *err_msg=fddi_msgs[rc-1];
         goto exit;
     }
 
     // Check sd card
-    if (sdc_prepare()!=SDCP_OK)
+    rc=sdc_prepare();
+    if (rc!=SDCP_OK)
     {
-        *err_msg="SD Card (prepare) failed.";
+        *err_msg=sdcp_msgs[rc-1];
         goto exit;
     }
     sdcpp=1; // sd card prepared, finalize needed
@@ -111,9 +112,10 @@ uint8_t make_image(char **err_msg)
             }
 
             ui_show_progress(PGS_WRITE);
-            if (sdc_save_track()!=SDCS_OK)
+            rc=sdc_save_track();
+            if (rc!=SDCS_OK)
             {
-                *err_msg="Save track failed.";
+                *err_msg=sdcs_msgs[rc-1];
                 goto exit;
             }
 
@@ -129,7 +131,7 @@ uint8_t make_image(char **err_msg)
 exit:
     if(sdcpp!=0 && sdc_finalize()!=SDCF_OK)
     {
-        *err_msg="SD Card (finalize) failed.";
+        //*err_msg="SD Card (finalize) failed.";
     }
     return res;
 }

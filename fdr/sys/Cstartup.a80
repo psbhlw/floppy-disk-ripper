@@ -22,7 +22,7 @@
         defs    0x200
 
 ; Entry point
-        RSEG    RCODE
+        RSEG    CSTART
         LD      SP,.SFE.(CSTACK-1)      ; from high to low address
 
         LD      HL,0xBE00               ; table address

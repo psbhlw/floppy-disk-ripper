@@ -23,15 +23,21 @@ uint8_t sdc_prepare(void);
 uint8_t sdc_save_track(void);
 uint8_t sdc_finalize(void);
 
-#define SDCI_ERROR      0
-#define SDCI_OK         1
+#define SDCI_OK         0
+#define SDCI_MOUNT_ERR  1
 
-#define SDCP_ERROR      0
-#define SDCP_OK         1
+#define SDCP_OK         0
+#define SDCP_MKDIR_ERR  1
+#define SDCP_CHDIR_ERR  2
+#define SDCP_EXIST      3
+#define SDCP_OPEN_ERR   4
 
-#define SDCS_ERROR      0
-#define SDCS_OK         1
+#define SDCS_OK         0
+#define SDCS_EXIST      1
+#define SDCS_OPEN_ERR   2
+#define SDCS_WRITE_ERR  3
+#define SDCS_BREAK      4
 
-#define SDCF_ERROR      0
-#define SDCF_OK         1
+#define SDCF_OK         0
+#define SDCF_ERROR      1
 

@@ -77,7 +77,7 @@ static void mk_filename(char *fn, uint8_t track, uint8_t side)
 
 
 // Open image file for write
-static uint8_t open_file(void)
+static FRESULT open_file(void)
 {
     FRESULT res;
     BYTE mode;
@@ -91,9 +91,7 @@ static uint8_t open_file(void)
     else
         mode = FA_WRITE|FA_CREATE_NEW;
     res=f_open(&fd, FDR_INFO.file_name, mode);
-    if (res!=FR_OK)
-        return 0;
-    return 1;
+    return res;
 }
 
 
@@ -101,7 +99,7 @@ static uint8_t open_file(void)
 // Init FS
 uint8_t sdc_init(void)
 {
-    return f_mount(&FatFs,"",0) == FR_OK;
+    return (f_mount(&FatFs,"",0) == FR_OK) ? SDCI_OK : SDCI_MOUNT_ERR;
 }
 
 
@@ -115,21 +113,24 @@ uint8_t sdc_prepare(void)
 
     res=f_mkdir_recursive(FDR_INFO.dir_name);
     if (res!=FR_OK && res!=FR_EXIST)
-        return 0;
+        return SDCP_MKDIR_ERR;
 
     f_chdir("/");
     res=f_chdir(FDR_INFO.dir_name);
     if (res!=FR_OK)
-        return 0;
+        return SDCP_CHDIR_ERR;
 
     // check single file mode
     if (FDR_INFO.single_file)
     {
-        if (!open_file())
-            return 0;
+        res=open_file();
+        if (res==FR_EXIST)
+            return SDCP_EXIST;
+        else if (res!=FR_OK)
+            return SDCP_OPEN_ERR;
     }
 
-    return 1;
+    return SDCP_OK;
 }
 
 
@@ -137,7 +138,7 @@ uint8_t sdc_prepare(void)
 uint8_t sdc_save_track(void)
 {
     FRESULT res;
-    BYTE page, i;
+    BYTE page, i, r = SDCS_OK;
     UINT bw, tbw;
     long bytesleft, trklen_old;
 
@@ -162,16 +163,27 @@ uint8_t sdc_save_track(void)
 
     // open file
     if (!FDR_INFO.single_file)
-        if (!open_file())
-            return 0;
+    {
+        res=open_file();
+        if (res==FR_EXIST)
+            return SDCS_EXIST;
+        else if (res!=FR_OK)
+            return SDCS_OPEN_ERR;
+    }
 
     // write header
     res=f_write(&fd, &FDR_HDR, sizeof(FDR_HDR), &bw);
     if (res!=FR_OK)
+    {
+        r = SDCS_WRITE_ERR;
         goto exit;
+    }
     res=f_write(&fd, trklen, sizeof(trklen[0])*(FDR_INFO.revs+1), &bw);
     if (res!=FR_OK)
+    {
+        r = SDCS_WRITE_ERR;
         goto exit;
+    }
 
     // save data
     page=DATA_START_PAGE;
@@ -185,15 +197,17 @@ uint8_t sdc_save_track(void)
         SET_PAGE(page);
         res=f_write(&fd, PAGE_START, tbw, &bw);
         if (res!=FR_OK || bw!=tbw)
-            break;
-
-        /* todo: exit at break
-        if(is_break_pressed())
         {
-            res=!FR_OK;
+            r = SDCS_WRITE_ERR;
             break;
         }
-        */
+
+        // exit at break
+        if(is_break_pressed())
+        {
+            r = SDCS_BREAK;
+            break;
+        }
 
         page++;
         bytesleft -= tbw;
@@ -207,7 +221,7 @@ exit:
 
     // restore default page
     SET_PAGE(PAGE_DEFAULT);
-    return res==FR_OK;
+    return r;
 }
 
 
@@ -218,7 +232,7 @@ uint8_t sdc_finalize(void)
         f_close(&fd);
 
     image_number++;
-    return 1;
+    return SDCF_OK;
 }
 
 
