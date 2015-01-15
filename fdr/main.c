@@ -66,8 +66,9 @@ uint8_t make_image(char **err_msg)
     static char * const sdcs_msgs[] = {"File already exists.", "FatFs: open error.", "FatFs: write error.", "Break pressed."};
 
     res = MKI_ERROR;
-    //memset(FDR_INFO.file_name, 0, 12);
-    FDR_INFO.file_name[0] = 0;
+    FDR_INFO.file_name[0] = 0;           // for empty file name
+    FDR_INFO.track = FDR_INFO.from_trk;  // for empty progress bar
+    FDR_INFO.side = FDR_INFO.sides & 1;  // for empty progress bar
     ui_show_progress(PGS_INIT);
 
     // Init ZC
@@ -96,10 +97,10 @@ uint8_t make_image(char **err_msg)
 
     s1=FDR_INFO.sides & 1;      // side from
     s2=1 + (!!FDR_INFO.sides);  // side to
-    sdir=(FDR_INFO.from_trk >= FDR_INFO.to_trk) ? -1 : 1;   // step dir
+    sdir=(FDR_INFO.from_trk > FDR_INFO.to_trk) ? -1 : 1;   // step dir
 
     // Capture loop
-    for (trk=FDR_INFO.from_trk; trk!=(FDR_INFO.to_trk+sdir); trk+=sdir)
+    for (trk=FDR_INFO.from_trk; trk!=(uint8_t)(FDR_INFO.to_trk+sdir); trk+=sdir)
         for (side=s1; side<s2; side++)
         {
             FDR_INFO.track = trk;

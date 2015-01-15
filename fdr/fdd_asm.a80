@@ -373,9 +373,8 @@ capt_loop
         jr c,capt_timeout2
 
         exx
-        ; get full captured length length
+        ; get full captured length
         BDCNT_READ
-        res 0,e                 ; last length must be even
         ld (hl),e
         inc hl
         ld (hl),d
@@ -383,7 +382,7 @@ capt_loop
         ld (hl),c
         inc hl
         ld (hl),0
-        inc hl
+;         inc hl
         exx
         xor a                   ; a=0 - ok
 capt_ex

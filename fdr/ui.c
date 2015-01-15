@@ -444,16 +444,15 @@ static void act_start(struct menu_item_t *m, uint8_t xoffs, uint8_t y, uint8_t l
         );
     gotoxy(25,3); print_char(FDR_INFO.drive + 'A');
     gotoxy(58,3); print_num(FDR_INFO.revs);
-    FDR_INFO.track=FDR_INFO.from_trk;
 
     res=make_image(&msg);
     if(res!=MKI_OK)
     {
-        msg_box(msg,0x27);
+        msg_box(msg,0xaf);
     }
     else
     {
-        msg_box("Well done!",0x6f);
+        msg_box("Well done!",0xe9);
     }
 
     while(is_key_pressed());
@@ -474,6 +473,27 @@ void ui_init(void)
     textmod_init();
 
     print_str("\x16\x05\x00" "Floppy Disk Ripper v0.1a" "\x16\x05\x01" "(c)2014, psb, tsl.");
+/*
+    // palette test
+    print_str("\n"
+    "\x10\x00" "0"
+    "\x10\x01" "1"
+    "\x10\x02" "2"
+    "\x10\x03" "3"
+    "\x10\x04" "4"
+    "\x10\x05" "5"
+    "\x10\x06" "6"
+    "\x10\x07" "7"
+    "\x10\x08" "8"
+    "\x10\x09" "9"
+    "\x10\x0a" "a"
+    "\x10\x0b" "b"
+    "\x10\x0c" "c"
+    "\x10\x0d" "d"
+    "\x10\x0e" "e"
+    "\x10\x0f" "f"
+    );
+*/
 }
 
 
@@ -577,7 +597,8 @@ void ui_show_progress(uint8_t op)
     }
 
     // Progress bar show
-    progr = pnow*PBAR_SIZE/progr;
+    if (progr)
+        progr = pnow*PBAR_SIZE/progr;
     if (progr)
         fill_attr(3,5+11,progr,PBAR_ON_CLR);
     if (progr<PBAR_SIZE)

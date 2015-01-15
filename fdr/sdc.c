@@ -140,7 +140,7 @@ uint8_t sdc_save_track(void)
     FRESULT res;
     BYTE page, i, r = SDCS_OK;
     UINT bw, tbw;
-    long bytesleft, trklen_old;
+    long bytesleft, trklen_old, addr;
 
 
     // fill header struct
@@ -153,13 +153,30 @@ uint8_t sdc_save_track(void)
     FDR_HDR.side = FDR_INFO.side;
     FDR_HDR.revs = FDR_INFO.revs;
 
+    // fill trklens
+    // hack: DMA puts data by words but lengths are snapshoted in bytes.
+    // we have to correct total length to an even value.
+    if(FDR_INFO.trklen[FDR_INFO.revs-1] == FDR_INFO.trklen[FDR_INFO.revs])
+    {
+        // no data in tail - correct also last rev length
+        FDR_INFO.trklen[FDR_INFO.revs-1] &= ~1;
+    }
+    FDR_INFO.trklen[FDR_INFO.revs] &= ~1;
+
     trklen_old = 0;
     for(i=0; i<=FDR_INFO.revs; i++) //revs+1 for tail
     {
-        trklen[i] = FDR_INFO.trklen[i] - trklen_old;
-        trklen_old = FDR_INFO.trklen[i];
+        addr = FDR_INFO.trklen[i];
+        // hack: if the whole buffer was filled with the data,
+        // trimmed to 0x00000 address was returned, so fix it.
+        if(addr==0) addr=0x80000;
+        trklen[i] = addr - trklen_old;
+        trklen_old = addr;
     }
     bytesleft = FDR_INFO.trklen[FDR_INFO.revs];
+    // hack: if the whole buffer was filled with the data,
+    // trimmed to 0x00000 address was returned, so fix it.
+    if(bytesleft==0) bytesleft=0x80000;
 
     // open file
     if (!FDR_INFO.single_file)
