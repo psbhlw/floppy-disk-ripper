@@ -23,6 +23,7 @@ all:
 
 	$(CP) fdr/README.md $(RELEASE_DIR)/fdr/README.md
 	$(CP) fdr/fdr.trd $(RELEASE_DIR)/fdr/fdr.trd
+	$(CP) fdr/fdr.spg $(RELEASE_DIR)/fdr/fdr.spg
 
 	$(CP) fdr/firmware/README.md $(RELEASE_DIR)/fdr/firmware/README.md
 	$(CP) fdr/firmware/ts-bios.rom $(RELEASE_DIR)/fdr/firmware/ts-bios.rom

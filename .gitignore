@@ -1,5 +1,6 @@
 /fdr/main.bin
 /fdr/main.html
+/fdr/_make_spg.bin
 /fdr/list/*
 /release/*
 *.exe
@@ -7,5 +8,6 @@
 *.bak
 *.udi
 *.trd
+*.spg
 *.FDR
 FDRIMAGE.*

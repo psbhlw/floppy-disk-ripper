@@ -8,6 +8,7 @@ RM=rm -f
 ASM=
 AFLAGS=
 SJASM=sjasmplus.exe
+SPGBLD=spgbld.exe
 
 # your favorite C
 CC=
@@ -24,7 +25,7 @@ OBJS=sys/Cstartup.o $(OBJFF)   main.o sdc.o fdd.o   keyb.o ui.o textmod.o fdd_as
 RES=fonts/robat.fnt
 
 
-all: fdr.trd
+all: fdr.trd fdr.spg
 	@echo OK.
 
 $(LIST_DIR):
@@ -78,8 +79,12 @@ main.bin: $(LIST_DIR) $(OBJS)
 fdr.trd: _make_trd.a80 main.bin
 	$(SJASM) _make_trd.a80  --nologo
 
+fdr.spg: _make_spg.a80 _make_spg.ini _make_spg.sys main.bin
+	$(SJASM) _make_spg.a80  --nologo
+	$(SPGBLD) -b _make_spg.ini fdr.spg -c 0
+
 
 clean:
-	$(RM) $(OBJS) main.bin fdr.trd
+	$(RM) $(OBJS) main.bin fdr.trd _make_spg.bin fdr.spg
 	$(RMDIR) $(LIST_DIR)
 
